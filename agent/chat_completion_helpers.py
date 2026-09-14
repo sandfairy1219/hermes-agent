@@ -1979,6 +1979,37 @@ def _reasoning_config_for_wire(agent):
     return agent.reasoning_config
 
 
+def _strip_tool_message_names(kwargs: dict) -> dict:
+    """Strip ``name`` from ``role:"tool"`` messages for endpoints that reject it.
+
+    OpenAI's chat-completions spec for tool-role messages carries only
+    ``role``/``content``/``tool_call_id`` — pairing happens by id, so the
+    optional ``name`` we add is redundant. GLM-flash-class endpoints enforce
+    this strictly and 400 with ``messages[N]: "name" is not supported by
+    this endpoint`` (observed on opencode-go relay, glm-5.3-flash, 2026-09).
+    Stripping on a shallow copy keeps the shared conversation history
+    untouched (name is re-added if the build sites evolve).
+    """
+    messages = kwargs.get("messages")
+    if not isinstance(messages, list):
+        return kwargs
+    changed = False
+    new_messages = []
+    for m in messages:
+        if isinstance(m, dict) and m.get("role") == "tool" and "name" in m:
+            copy = dict(m)
+            copy.pop("name", None)
+            new_messages.append(copy)
+            changed = True
+        else:
+            new_messages.append(m)
+    if not changed:
+        return kwargs
+    kwargs = dict(kwargs)
+    kwargs["messages"] = new_messages
+    return kwargs
+
+
 def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = None) -> dict:
     """Build the keyword arguments dict for the active API mode.
 
@@ -1987,15 +2018,24 @@ def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = Non
     (chat_completions / codex_responses / anthropic_messages all route
     OpenCode models). No-op for every other provider.
     """
-    from agent.opencode_affinity import merge_opencode_session_headers
+    from agent.opencode_affinity import (
+        is_opencode_target,
+        merge_opencode_session_headers,
+    )
 
     kwargs = _build_api_kwargs_for_mode(agent, api_messages, tools_for_api)
-    return merge_opencode_session_headers(
+    kwargs = merge_opencode_session_headers(
         kwargs,
         getattr(agent, "provider", None),
         getattr(agent, "base_url", None),
         getattr(agent, "session_id", None),
     )
+    # GLM-flash류 엔드포인트는 tool 메시지의 "name"을 거부함 (HTTP 400).
+    # spec상 불필요한 필드이므로 OpenCode 타겟에서만 제거 — 다른
+    # OpenAI-wire 프로바이더(레거시 function-포맷 플로우 등)는 보존.
+    if is_opencode_target(getattr(agent, "provider", None), getattr(agent, "base_url", None)):
+        kwargs = _strip_tool_message_names(kwargs)
+    return kwargs
 
 
 def _build_api_kwargs_for_mode(agent, api_messages: list, tools_for_api: list | None = None) -> dict:
