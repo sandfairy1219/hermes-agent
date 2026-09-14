@@ -262,3 +262,42 @@ scripts/run_tests.sh
 MIT — see [LICENSE](LICENSE).
 
 Built by [Nous Research](https://nousresearch.com).
+
+---
+
+## 백업 레포 — 설치 / 실행 (Quick start)
+
+이 레포는 개인 Hermes Agent 작업 사본의 백업이다. 실제 시크릿과 로컬 상태는 커밋하지 않는다 — `.env`, `config.yaml`, `*.key`, `venv/`, `.pm2/`, `__pycache__/`, `*.pyc` (자세한 목록은 `.gitignore`).
+
+### 소스에서 설치 (복원/개발용)
+
+```bash
+git clone https://github.com/sandfairy1219/hermes-agent.git
+cd hermes-agent
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e .
+cp config.yaml.example ~/.hermes/config.yaml    # YOUR_* 자리표시자를 실제 값으로 교체
+# 시크릿은 ~/.hermes/.env 에 넣는다:
+#   OPENROUTER_API_KEY=...  DISCORD_BOT_TOKEN=...  FINNHUB_API_KEY=...
+```
+
+### 실행
+
+```bash
+hermes           # CLI 대화 시작
+hermes setup     # 전체 설정 마법사 (프로바이더 · 키 · 플랫폼)
+hermes model     # 프로바이더 / 모델 변경
+hermes tools     # 툴셋 on/off
+hermes gateway   # 메시징 게이트웨이 실행 (Discord, Telegram, Slack …)
+```
+
+### 참고
+
+- 설정·상태 경로: `~/.hermes/` (`config.yaml`, `.env`, `skills/`, `memories/`, `cron/`, `logs/`)
+- 원클릭 설치(업스트림): `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`
+- 업스트림 최신화: `git fetch origin && git rebase origin/main`
+- 문서: https://hermes-agent.nousresearch.com/docs
+- ⚠️ `.github/workflows/` (CI 워크플로 32개)는 이 백업에서 제외됨 — GitHub PAT에
+  `workflow` 스코프가 없어 해당 경로 포함 푸시가 거부되기 때문. 파일 자체는 로컬
+  워킹트리에 그대로 있다. `workflow` 스코프 포함 토큰 또는 SSH 인증으로 바꾸면
+  다시 포함해서 푸시할 수 있다.
